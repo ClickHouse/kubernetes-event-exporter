@@ -28,11 +28,12 @@ type ClickHouseConfig struct {
 	MaxOpenConns      *int     `yaml:"maxOpenConns"`
 	ConnMaxLifetimeMs *int     `yaml:"connMaxLifetimeMs"`
 	ConnMaxIdleTimeMs *int     `yaml:"connMaxIdleTimeMs"`
+	ClickhouseCluster string   `yaml:"clickhouseCluster"`
 }
 
 const (
 	defaultTableEngine = "MergeTree"
-	ddlFmt             = `CREATE TABLE %s (
+	ddlFmt             = `CREATE TABLE %s %s(
 	KubeClusterName LowCardinality(String),
 	Reason LowCardinality(String),
 	Message String CODEC(ZSTD),
@@ -58,7 +59,8 @@ const (
 	ReportingComponent LowCardinality(String),
 	ReportingInstance String,
 ) ENGINE = %s
-ORDER BY (Name, Namespace, LastTimestamp)
+ORDER BY (KubeClusterName, Namespace, Kind, Name, Type, LastTimestamp)
+PRIMARY KEY (KubeClusterName, Namespace, Kind, Name, Type, LastTimestamp)
 PARTITION BY toYYYYMM(LastTimestamp)
 %s
 ;`
@@ -183,7 +185,10 @@ func NewClickHouse(cfg *ClickHouseConfig) (*ClickHouse, error) {
 			if cfg.TableTTLDays != nil {
 				ttlStatement = fmt.Sprintf(ttlStatementFmt, *cfg.TableTTLDays)
 			}
-			_, err = db.Exec(fmt.Sprintf(ddlFmt, cfg.TableName, tableEngine, ttlStatement))
+			if cfg.ClickhouseCluster != "" {
+				cfg.ClickhouseCluster = fmt.Sprintf("ON CLUSTER %s", cfg.ClickhouseCluster)
+			}
+			_, err = db.Exec(fmt.Sprintf(ddlFmt, cfg.TableName, cfg.ClickhouseCluster, tableEngine, ttlStatement))
 			if err != nil {
 				return nil, err
 			}
