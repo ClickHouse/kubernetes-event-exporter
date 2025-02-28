@@ -163,14 +163,13 @@ func NewClickHouse(cfg *ClickHouseConfig) (*ClickHouse, error) {
 		db.SetConnMaxIdleTime(time.Duration(*cfg.ConnMaxIdleTimeMs) * time.Millisecond)
 	}
 
-	err := db.Ping()
-	if err != nil {
-		return nil, err
-	}
-
 	if cfg.CreateTable {
+		err := db.Ping()
+		if err != nil {
+			return nil, err
+		}
 		var exists int
-		err := db.QueryRow(fmt.Sprintf("EXISTS %s", cfg.TableName)).Scan(&exists)
+		err = db.QueryRow(fmt.Sprintf("EXISTS %s", cfg.TableName)).Scan(&exists)
 		if err != nil {
 			return nil, err
 		}
